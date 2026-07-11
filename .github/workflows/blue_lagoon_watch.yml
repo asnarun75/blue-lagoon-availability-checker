@@ -2,7 +2,7 @@ name: Blue Lagoon Availability Watch
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # every 5 minutes — GitHub only runs scheduled workflows from the default branch
+    - cron: "*/10 * * * *"   # every 5 minutes — GitHub only runs scheduled workflows from the default branch
   workflow_dispatch:         # allow manual "dry run" trigger from GitHub UI
 
 jobs:
