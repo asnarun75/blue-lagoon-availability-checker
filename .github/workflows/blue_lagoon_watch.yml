@@ -1,0 +1,52 @@
+name: Blue Lagoon Availability Watch
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 minutes — GitHub only runs scheduled workflows from the default branch
+  workflow_dispatch:         # allow manual "dry run" trigger from GitHub UI
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # needed to commit state.json back
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browser
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run availability check
+        env:
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_EMAIL:       ${{ secrets.NOTIFY_EMAIL }}
+        run: python -m blue_lagoon_watcher.agent
+
+      - name: Upload debug snapshot (last run's screenshots/HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blue-lagoon-debug
+          path: blue_lagoon_watcher/debug/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      - name: Commit state
+        if: always()
+        run: |
+          git config user.name  "blue-lagoon-watch-bot"
+          git config user.email "bot@github-actions"
+          [ -f blue_lagoon_watcher/state.json ] || exit 0
+          git add blue_lagoon_watcher/state.json
+          git diff --cached --quiet || git commit -m "chore: update availability state $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push origin HEAD
