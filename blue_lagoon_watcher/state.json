@@ -1,10 +1,10 @@
 {
   "retreat": {
-    "available": true,
-    "streak": 17
+    "available": false,
+    "streak": 0
   },
   "silica": {
-    "available": true,
-    "streak": 17
+    "available": false,
+    "streak": 0
   }
 }
