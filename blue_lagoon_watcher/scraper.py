@@ -130,18 +130,21 @@ def _walk_json_for_rooms(obj, hotel_slug: str, hotel_name: str, url: str, out: l
                 if isinstance(v, bool):
                     avail = (not v) if key.lower().startswith(("soldout", "issoldout")) else v
                     break
-            price = None
-            for key in ("price", "totalPrice", "priceFormatted", "amount"):
-                v = obj.get(key)
-                if v is not None:
-                    price = str(v)
-                    break
-            if avail is None:
-                avail = True  # present in a rooms/rates list generally implies bookable
-            out.append(RoomMatch(
-                hotel_slug=hotel_slug, hotel_name=hotel_name, room_name=name,
-                sqft=size, price=price, available=bool(avail), source_url=url,
-            ))
+            # Require BOTH a real size and an explicit availability boolean on this object.
+            # Sites also embed room-name text in pure marketing/CMS content (image alt text,
+            # asset names, etc.) that has neither field — without this guard those get treated
+            # as available rooms, which is a false positive, not "no signal".
+            if size is not None and avail is not None:
+                price = None
+                for key in ("price", "totalPrice", "priceFormatted", "amount"):
+                    v = obj.get(key)
+                    if v is not None:
+                        price = str(v)
+                        break
+                out.append(RoomMatch(
+                    hotel_slug=hotel_slug, hotel_name=hotel_name, room_name=name,
+                    sqft=size, price=price, available=bool(avail), source_url=url,
+                ))
 
         for v in obj.values():
             _walk_json_for_rooms(v, hotel_slug, hotel_name, url, out)
@@ -188,14 +191,20 @@ def _extract_from_text(page, hotel_slug: str, hotel_name: str, url: str) -> list
     for text in candidates:
         if not text or not _matches_room_keyword(text):
             continue
-        sqft = _sqft_from_text(text)
         avail = _looks_available(text)
-        if sqft is None and avail is None:
-            continue  # too little signal to trust this block
+        if avail is None:
+            # DOM selectors match nested parent/child fragments of the same card (e.g. a
+            # "…details" element with the name+size but not the booking button, alongside
+            # the full card that has both). A fragment with no explicit sold-out/bookable
+            # wording is not a real signal — only the fragment that contains both the size
+            # AND the availability control is trustworthy. Silently defaulting this to
+            # "available" is how a not-available room becomes a false-positive alert.
+            continue
+        sqft = _sqft_from_text(text)
         first_line = next((l.strip() for l in text.splitlines() if l.strip()), text[:80])
         found.append(RoomMatch(
             hotel_slug=hotel_slug, hotel_name=hotel_name, room_name=first_line,
-            sqft=sqft, price=None, available=bool(avail) if avail is not None else True,
+            sqft=sqft, price=None, available=avail,
             source_url=url,
         ))
     return found
@@ -228,7 +237,7 @@ def check_hotel(hotel_slug: str, hotel_name: str, headless: bool = True) -> Hote
 
         result.matches = [
             m for m in matches
-            if m.sqft is None or m.sqft >= config.MIN_SQFT
+            if m.available and (m.sqft is None or m.sqft >= config.MIN_SQFT)
         ]
     except Exception as exc:  # keep one hotel's failure from killing the whole run
         log.exception("Failed checking %s", hotel_name)
