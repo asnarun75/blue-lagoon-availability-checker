@@ -5,8 +5,8 @@ User preferences — edit these before running.
 import os
 
 # ── Stay dates ──────────────────────────────────────────────────────────────
-CHECK_IN  = "2026-07-20"
-CHECK_OUT = "2026-07-22"
+CHECK_IN  = "2026-12-29"
+CHECK_OUT = "2026-12-31"
 
 # ── Guests (matches the search you gave us) ──────────────────────────────────
 ADULTS   = 2
@@ -17,13 +17,10 @@ INFANTS  = 0
 MIN_SQFT      = 500
 ROOM_KEYWORDS = ["suite"]   # room name must contain one of these (case-insensitive)
 
-# ── Hotels to check, in priority order ────────────────────────────────────────
-# "retreat" is checked first because it's the preferred property; "silica" is
-# the fallback. If bluelagoon.com uses a different slug for The Retreat, update
-# it here after the first dry run (see debug artifact in the GitHub Action).
+# ── Hotels to check ────────────────────────────────────────────────────────────
+# Single location only for this search.
 HOTELS = [
     {"slug": "retreat", "name": "The Retreat Hotel"},
-    {"slug": "silica",  "name": "Silica Hotel"},
 ]
 
 BASE_URL = "https://www.bluelagoon.com/book/hotel/{slug}"
